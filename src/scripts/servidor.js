@@ -1,50 +1,55 @@
-// Creando nuestro servidor con expressJs
 const express = require('express');
 const odbc = require('odbc');
 const cors = require('cors');
 const multer = require('multer');
 
-const upload =multer()
-// Creando nuestra instancia de express el cual correra en el puerto 3000.
-const app = express()
+const upload = multer();
+const app = express();
 const port = 3000;
 
-async function connectToAccess (){
-    return await odbc.connect(`
-        DRIVER={ Microsoft Access Driver (*.mdb, *.accdb)}; BDQ=C://Ruta_de_mi_db.accdb
-        `)
+app.use(cors());
+app.use(express.json());
+app.use(upload.none());
+
+async function connectToAccess() {
+    try {
+        return await odbc.connect(`DRIVER={Microsoft Access Driver (*.mdb, *.accdb)};DBQ=C:/Users/salva/OneDrive/Documentos/accessdb.accdb`);
+    } catch (error) {
+        console.error('Error connecting to database:', error);
+        throw error;
+    }
 }
 
-    // Ruta de tipo post para el registro de un usuario
-app.post('/registro', async(req, res)=>{
-    //Extraemos los datos del cuarpo de la solicitud
-    const {nombre, apellido, correo, password, confirm_password} = req.body
+app.post('/registro', async (req, res) => {
+    const { nombre, apellido, correo, password, confirm_password } = req.body;
+
+    // Escapar adecuadamente los valores para prevenir inyecciones SQL
+    const escapeString = (str) => {
+        return str.replace(/'/g, "''");
+    };
+
+    const escapedNombre = escapeString(nombre);
+    const escapedApellido = escapeString(apellido);
+    const escapedCorreo = escapeString(correo);
+    const escapedPassword = escapeString(password);
+    const escapedConfirmPassword = escapeString(confirm_password);
 
     try {
-        // Establecemos contacto con la base de datos de Access utilizando una funcion asyncrona (connectToAccess())
-        const connect = await connectToAccess()
+        const connect = await connectToAccess();
 
-        // Crearemo un query para poder insertar estos datos en mi db
-        const query = `INSERT INTO usuarios (nombre, apellido, , password, confirm_password)
-        VALUES ('${nombre}','${apellido}','${correo}','${password}','${confirm_password}')`
-    
-        //Ejecutamos la consulta a la base de datos
-        await connect.query(query)
+        const query = `INSERT INTO usuarios (nombre, apellido, correo, password, confirm_password) VALUES ('${escapedNombre}', '${escapedApellido}', '${escapedCorreo}', '${escapedPassword}', '${escapedConfirmPassword}')`;
 
-        // si la consulta sale bien enviamos una respuesta indicando que el usuario fue creado con exito
-        res.send(`Usuario creado con Exito `)
+        await connect.query(query);
 
-        // Cerramos la conexion con la base de datos
-        await connect.close()
+        res.send('Usuario creado con éxito');
+
+        await connect.close();
     } catch (error) {
+        console.log(error);
+        res.status(500).send('Usuario no creado :C ' + error);
+    }
+});
 
-        // Si ocrru un error enviamos un 500 indicando que el usuario no a sido creado
-        res.status(500).send('Usuario No creado :C '+ error)
-    }    
-})
-
- 
-// Iniciando el servidor, funcion de callback que se ejecutara una vez que el servidor este corriendo
-app.listen(port, ()=>{
-    console.log(`app corriendo en el puerto http://localHost:${port}`)
-})
+app.listen(port, () => {
+    console.log(`app corriendo en el puerto http://localhost:${port}`);
+});
